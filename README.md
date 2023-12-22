@@ -13,16 +13,16 @@ Project in Packet Tracer
     SYSLOG Server
     
 ### R1
-Role based CLI
+    Role based CLI
 
 ### R2
-Local aaa authen.
-
-DHCP Server
-
-Inter vlan routing :                
-                    -Vlan 10
-                    -Vlan 20 
-                    -Vlan 99
+    Local aaa authen.
+    
+    DHCP Server
+    
+    Inter vlan routing :                
+                        -Vlan 10
+                        -Vlan 20 
+                        -Vlan 99
 
 
