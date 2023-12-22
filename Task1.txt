@@ -1,0 +1,545 @@
+R0
+----
+en
+conf t
+hostname R0
+no ip domain-lookup
+no cdp run
+banner motd #Hello #
+enable secret ciscoR0
+service password-encryption
+username admin0 secret admin0pass
+
+line con 0
+password cisco
+logging synchronous
+exec-timeout 3 50
+login
+
+line vty 0 4
+password cisco
+exec-timeout 3 50
+transport input ssh
+login local
+
+
+interface s0/0/0
+ip address 192.168.100.225  255.255.255.252
+no shutdown
+
+interface s0/1/1
+ip address 192.168.100.229  255.255.255.252
+no shutdown
+
+interface Lo0
+ip address 192.168.100.65  255.255.255.224
+no shutdown
+ 
+int s0/0/0
+ ip ospf message-digest-key 1 md5 MD5pa55
+int s0/1/1
+ ip ospf message-digest-key 1 md5 MD5pa55
+ 
+router ospf 10
+router-id 1.1.1.1
+network 192.168.100.224 0.0.0.3 area 0
+network 192.168.100.228 0.0.0.3 area 0
+network 192.168.100.64 0.0.0.31 area 0
+area 0 authentication message-digest
+
+===========================================
+R1
+----
+en
+conf t
+hostname R1
+no ip domain-lookup
+no cdp run
+banner motd #Hello #
+
+enable secret ciscoR1
+service password-encryption
+security passwords min-length 10
+login block-for 600 attempts 2 within 60
+username admin1 secret admin1pass
+
+line con 0
+password cisco
+logging synchronous
+exec-timeout 3 50
+login
+
+line vty 0 4
+password ciscocisco
+exec-timeout 3 50
+transport input ssh
+login local
+
+line vty 0 4
+ password ciscocisco
+ exec-timeout 3 50
+ transport input telnet
+ login local
+ ex
+
+-------------
+interface s0/0/0
+ip address 192.168.100.226  255.255.255.252
+no shutdown
+
+interface s0/0/1
+ip address 192.168.100.242  255.255.255.252
+no shutdown
+
+interface g0/0
+ip address 192.168.100.237  255.255.255.252
+no shutdown
+
+interface g0/1
+ip address 192.168.100.193  255.255.255.224
+no shutdown
+
+interface g0/2
+ip address 192.168.100.33  255.255.255.224
+no shutdown
+
+interface Lo2
+ip address 1.1.1.1  255.255.255.255
+ex
+
+-------------
+#ospf authen#
+-------------
+int s0/0/0
+ ip ospf message-digest-key 1 md5 MD5pa55
+int s0/0/1
+ ip ospf message-digest-key 1 md5 MD5pa55
+int g0/0
+ ip ospf message-digest-key 1 md5 MD5pa55
+
+---------
+#Routing#
+---------
+ip route 0.0.0.0 0.0.0.0 Lo2
+
+router ospf 10
+router-id 2.2.2.2
+network 192.168.100.240 0.0.0.3 area 0
+network 192.168.100.224 0.0.0.3 area 0
+network 192.168.100.236 0.0.0.3 area 0
+network 192.168.100.32  0.0.0.31 area 0
+network 192.168.100.192 0.0.0.31 area 0
+default-information originate
+area 0 authentication message-digest
+end
+
+----------------
+#Role based CLI#
+----------------
+conf t
+parser view admin1
+  secret admin1pass
+  commands exec include all show
+  commands exec include all config terminal
+  commands exec include all debug
+  end
+
+conf t
+ parser view admin2
+  secret admin2pass
+  commands exec include all show
+  end
+
+conf t
+parser view admin3
+ secret admin3pass
+ commands exec include show version
+ commands exec include show interfaces
+ commands exec include show ip interface brief
+ commands exec include show parser view
+ end
+
+
+---------------
+#TACACS Server#
+---------------
+conf t
+username admin secret admin12345
+tacacs-server host 192.168.100.34
+tacacs-server key tacacspass
+aaa new-model
+aaa authentication login default group tacacs+ local
+aaa authorization exec default group tacacs+ 
+aaa accounting exec default start-stop group tacacs+ 
+
+line console 0
+ login authentication default
+
+--------
+#syslog#
+--------
+on all devices
+conf t
+
+ logging 192.168.100.34
+ logging trap debugging 
+ logging on
+
+
+
+
+-----
+NTP
+----
+on R1 
+ntp master 1
+ntp server 192.168.100.34
+
+on all devices
+conf t
+ntp server 1.1.1.1
+service timestamps log datetime msec
+
+
+================================================
+
+R2
+----
+en
+conf t
+hostname R2
+no ip domain-lookup
+aaa new-model
+no cdp run
+banner motd #Hello #
+enable secret ciscoR2
+service password-encryption
+username admin2 secret admin2pass
+
+line con 0
+password cisco
+logging synchronous
+exec-timeout 3 50
+login
+
+line vty 0 4
+password cisco
+exec-timeout 3 50
+transport input ssh
+login local
+
+------------------
+#Local aaa authen#
+------------------
+aaa new-model
+aaa authentication login default local enable
+
+line console 0
+ login authentication default
+
+ip domain-name netsec.com
+crypto key generate rsa general-keys modulus 1024
+aaa authentication login SSH-LOGIN local
+
+line vty 0 4
+ login authentication SSH-LOGIN
+ transport input ssh
+
+
+
+interface s0/0/1
+ip address 192.168.100.241  255.255.255.252
+no shutdown
+
+interface s0/1/1
+ip address 192.168.100.233  255.255.255.252
+no shutdown
+
+------------------
+#sub interfaces &
+dhcp server #
+------------------
+int g0/0
+no sh
+
+interface G0/0.10
+ip address 192.168.100.129  255.255.255.224
+encapsulation dot1Q 10
+
+interface G0/0.20
+ip address 192.168.100.161  255.255.255.224
+encapsulation dot1Q 20
+
+interface G0/0.99
+ip address 192.168.100.1  255.255.255.224
+encapsulation dot1Q 99 Native
+
+
+ip dhcp pool Vlan10
+ network 192.168.100.128 255.255.255.224
+ default-router 192.168.100.129
+
+ip dhcp pool Vlan20
+ network 192.168.100.160 255.255.255.224
+ default-router 192.168.100.161
+
+ip dhcp pool Vlan99
+ network 192.168.100.0 255.255.255.224
+ default-router 192.168.100.1
+
+
+-------------
+#ospf authen#
+-------------
+int s0/0/1
+ ip ospf message-digest-key 1 md5 MD5pa55
+int s0/1/1
+ ip ospf message-digest-key 1 md5 MD5pa55
+int g0/0
+ ip ospf message-digest-key 1 md5 MD5pa55
+
+------------------
+router ospf 10
+router-id 3.3.3.3
+network 192.168.100.240 0.0.0.3 area 0
+network 192.168.100.232 0.0.0.3 area 0
+network 192.168.100.128 0.0.0.31 area 0
+network 192.168.100.160  0.0.0.31 area 0
+network 192.168.100.0 0.0.0.31 area 0
+area 0 authentication message-digest
+end
+
+
+==================================================
+R3
+----
+en
+conf t
+hostname R3
+no ip domain-lookup
+no cdp run
+banner motd #Hello #
+enable secret ciscoR3
+service password-encryption
+username admin3 secret admin3pass
+
+line con 0
+password cisco
+logging synchronous
+exec-timeout 3 50
+login
+
+line vty 0 4
+password cisco
+exec-timeout 3 50
+transport input ssh
+login local
+
+interface s0/1/0
+ip address 192.168.100.230  255.255.255.252
+no shutdown
+
+interface s0/1/1
+ip address 192.168.100.234  255.255.255.252
+no shutdown
+
+interface g0/0
+ip address 192.168.100.238  255.255.255.252
+no shutdown
+
+interface Lo3
+ip address 192.168.100.97  255.255.255.224
+no shutdown
+
+-------------
+#ospf authen#
+-------------
+int s0/1/0
+ ip ospf message-digest-key 1 md5 MD5pa55
+int s0/1/1
+ ip ospf message-digest-key 1 md5 MD5pa55
+int g0/0
+ ip ospf message-digest-key 1 md5 MD5pa55
+-----------------
+router ospf 10
+router-id 4.4.4.4
+network 192.168.100.228 0.0.0.3 area 0
+network 192.168.100.232 0.0.0.3 area 0
+network 192.168.100.236 0.0.0.3 area 0
+network 192.168.100.96 0.0.0.31 area 0
+area 0 authentication message-digest
+======================================================
+
+sw3
+--------
+hostname sw3
+banner motd # sw3 #
+enable secret ciscos3
+service password-encryption
+
+line con 0
+password cisco
+exec-timeout 3 50
+logging synchronous
+login
+exit
+
+interface g0/1
+switchport mode trunk
+no shutdown
+
+config t
+ntp authenticate
+ntp authentication-key 1 md5 cisco
+ntp trusted-key 1
+ntp server 1.1.1.1
+service timestamps log datetime msec
+end
+sh clock detail
+copy running-config startup-config
+==========================
+sw1
+--------
+hostname sw1
+banner motd # sw1,connected sw0, sw2 #
+enable secret ciscos1
+service password-encryption
+
+line con 0
+password cisco
+exec-timeout 3 50
+logging synchronous
+login
+exit
+
+vlan 10
+ name vlan10
+vlan 20
+ name vlan20
+vlan 99
+ name Managment
+
+
+interface g0/1-2 ,f0/1 
+switchport mode trunk
+no shutdown
+
+config t
+ntp authenticate
+ntp authentication-key 1 md5 cisco
+ntp trusted-key 1
+ntp server 1.1.1.1
+service timestamps log datetime msec
+end
+sh clock detail
+copy running-config startup-config
+
+===============================
+sw2
+--------
+hostname sw2
+banner motd # sw2, has vlan 10 #
+enable secret ciscos2
+service password-encryption
+
+line con 0
+password cisco
+exec-timeout 3 50
+logging synchronous
+login
+exit
+
+vlan 10
+ name vlan10
+vlan 20
+ name vlan20
+vlan 99
+ name Managment
+
+
+interface range f0/1-2
+switchport mode access
+switchport access vlan 10
+ex
+
+config t
+ntp authenticate
+ntp authentication-key 1 md5 cisco
+ntp trusted-key 1
+ntp server 1.1.1.1
+service timestamps log datetime msec
+end
+sh clock detail
+copy running-config startup-config
+
+============================
+sw0
+--------
+hostname sw0
+banner motd # sw0,has vlan 20 #
+enable secret ciscos0
+service password-encryption
+
+line con 0
+password cisco
+exec-timeout 3 50
+logging synchronous
+login
+exit
+
+
+vlan 10
+ name vlan10
+vlan 20
+ name vlan20
+vlan 99
+ name Managment
+
+interface range f0/2-3
+switchport mode access
+switchport access vlan 20
+ex
+
+config t
+ntp authenticate
+ntp authentication-key 1 md5 cisco
+ntp trusted-key 1
+ntp server 1.1.1.1
+service timestamps log datetime msec
+end
+sh clock detail
+copy running-config startup-config
+============================
+sw4
+-----
+hostname sw4
+banner motd # sw4 #
+enable secret ciscos4
+service password-encryption
+
+line con 0
+password cisco
+exec-timeout 3 50
+logging synchronous
+login
+exit
+
+interface g0/1
+switchport mode trunk
+no shutdown
+
+#syslog#
+--------
+ logging 192.168.100.34
+
+#ntp#
+-------
+config t
+ntp authenticate
+ntp authentication-key 1 md5 cisco
+ntp trusted-key 1
+ntp server 1.1.1.1
+service timestamps log datetime msec
+end
+sh clock detail
+copy running-config startup-config
